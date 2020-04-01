@@ -17,23 +17,43 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.ModelAndView;
 
+import com.nimbusds.jwt.JWT;
 import com.nimbusds.oauth2.sdk.AuthorizationCode;
+import com.nimbusds.oauth2.sdk.AuthorizationCodeGrant;
+import com.nimbusds.oauth2.sdk.AuthorizationGrant;
 import com.nimbusds.oauth2.sdk.ParseException;
 import com.nimbusds.oauth2.sdk.ResponseType;
 import com.nimbusds.oauth2.sdk.Scope;
+import com.nimbusds.oauth2.sdk.TokenErrorResponse;
+import com.nimbusds.oauth2.sdk.TokenRequest;
+import com.nimbusds.oauth2.sdk.TokenResponse;
+import com.nimbusds.oauth2.sdk.auth.ClientAuthentication;
+import com.nimbusds.oauth2.sdk.auth.ClientSecretBasic;
+import com.nimbusds.oauth2.sdk.auth.Secret;
 import com.nimbusds.oauth2.sdk.http.HTTPResponse;
 import com.nimbusds.oauth2.sdk.id.ClientID;
 import com.nimbusds.oauth2.sdk.id.State;
+import com.nimbusds.oauth2.sdk.token.AccessToken;
+import com.nimbusds.oauth2.sdk.token.RefreshToken;
 import com.nimbusds.openid.connect.sdk.AuthenticationErrorResponse;
 import com.nimbusds.openid.connect.sdk.AuthenticationRequest;
 import com.nimbusds.openid.connect.sdk.AuthenticationResponse;
 import com.nimbusds.openid.connect.sdk.AuthenticationResponseParser;
 import com.nimbusds.openid.connect.sdk.AuthenticationSuccessResponse;
 import com.nimbusds.openid.connect.sdk.Nonce;
+import com.nimbusds.openid.connect.sdk.OIDCTokenResponse;
+import com.nimbusds.openid.connect.sdk.OIDCTokenResponseParser;
 
 
 @RestController
 public class MVCController {
+	
+	String OIDCClientID = "OIDCClient"; 
+	String secret = "secret";
+	String callback = "http://mucs.oidcclient.com:8003/callback";
+	String tokenEndpoint = "https://cas.example.org:8443/cas/oidc/token";
+	String authorizationEndpoint = "https://cas.example.org:8443/cas/oidc/authorize";
+	
 	/*@GetMapping("/CASlogin")
 	public ModelAndView redirectWithUsingRedirectPrefix(ModelMap model) {
         model.addAttribute("service", "http://localhost:8000");
@@ -55,7 +75,7 @@ public class MVCController {
 	@GetMapping("/login")
 	public void login(HttpServletRequest request, HttpServletResponse response) {
 		// The client identifier provisioned by the server
-		ClientID clientID = new ClientID("OIDCClient");
+		ClientID clientID = new ClientID(OIDCClientID);
 
 		// Generate random state string for pairing the response to the request
 		State state = new State();
@@ -67,11 +87,11 @@ public class MVCController {
 		AuthenticationRequest req;
 		try {
 			req = new AuthenticationRequest(
-			    new URI("https://cas.example.org:8443/cas/oidc/authorize"),
+			    new URI(this.authorizationEndpoint),
 			    new ResponseType("code"),
 			    Scope.parse("openid email profile"),
 			    clientID,
-			    new URI("http://mucs.oidcclient.com:8003/callback"), // The client callback URL
+			    new URI(this.callback),
 			    state,
 			    nonce);
 			
@@ -114,7 +134,69 @@ public class MVCController {
 		System.out.println(code);
 		System.out.println(state);
 		
+		// Construct the code grant from the code obtained from the authz endpoint
+		// and the original callback URI used at the authz endpoint
+		AuthorizationCode authCode = new AuthorizationCode(code);
+		URI callback = null;
+		try {
+			callback = new URI(this.callback);
+		} catch (URISyntaxException e2) {
+			// TODO Auto-generated catch block
+			e2.printStackTrace();
+		}
+		AuthorizationGrant codeGrant = new AuthorizationCodeGrant(authCode, callback);
+
+		// The credentials to authenticate the client at the token endpoint
+		ClientID clientID = new ClientID(this.OIDCClientID);
+		Secret clientSecret = new Secret(this.secret);
+		ClientAuthentication clientAuth = new ClientSecretBasic(clientID, clientSecret);
+
+		// The token endpoint
+		URI tokenEndpoint = null;
+		try {
+			tokenEndpoint = new URI(this.tokenEndpoint);
+		} catch (URISyntaxException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+		}
+		
+		// Make the token request
+		TokenRequest tokenRequest = new TokenRequest(tokenEndpoint, clientAuth, codeGrant);
+
+		TokenResponse tokenResponse = null;
+		try {
+			tokenResponse = OIDCTokenResponseParser.parse(tokenRequest.toHTTPRequest().send());
+		} catch (ParseException | IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+
+		if(tokenResponse == null)
+			System.out.println("response null");
+		
+		if (! tokenResponse.indicatesSuccess()) {
+		    // We got an error response...
+		    TokenErrorResponse errorResponse = tokenResponse.toErrorResponse();
+		    System.out.println("error response");
+		    System.out.println(errorResponse);
+		}else {
+			OIDCTokenResponse successResponse = (OIDCTokenResponse)tokenResponse.toSuccessResponse();
+			// Get the ID and access token, the server may also return a refresh token
+			JWT idToken = successResponse.getOIDCTokens().getIDToken();
+			AccessToken accessToken = successResponse.getOIDCTokens().getAccessToken();
+			RefreshToken refreshToken = successResponse.getOIDCTokens().getRefreshToken();
+			
+			System.out.println("idToken: "+ idToken);
+			System.out.println("accessToken: "+ accessToken);
+			System.out.println("refreshToken: "+ refreshToken);
+		}
 		return new ModelAndView("callback");
 	}
+	
+	@GetMapping("/info")
+	public String getUserInfo(Model model) {
+		//model.addAttribute("name", name);
+		return "greeting";
+	} 
 	
 }
