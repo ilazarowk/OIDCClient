@@ -26,6 +26,8 @@ dependencies {
 	
 	//Nimbus oidc client
 	implementation 'com.nimbusds:oauth2-oidc-sdk:7.3'
+	//JSON
+	compile ('com.fasterxml.jackson.core:jackson-databind:2.9.8')
 	
 	developmentOnly 'org.springframework.boot:spring-boot-devtools'
 	providedRuntime 'org.springframework.boot:spring-boot-starter-tomcat'

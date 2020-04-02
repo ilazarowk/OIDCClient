@@ -17,6 +17,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.ModelAndView;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nimbusds.jwt.JWT;
 import com.nimbusds.oauth2.sdk.AuthorizationCode;
 import com.nimbusds.oauth2.sdk.AuthorizationCodeGrant;
@@ -34,6 +36,7 @@ import com.nimbusds.oauth2.sdk.http.HTTPResponse;
 import com.nimbusds.oauth2.sdk.id.ClientID;
 import com.nimbusds.oauth2.sdk.id.State;
 import com.nimbusds.oauth2.sdk.token.AccessToken;
+import com.nimbusds.oauth2.sdk.token.BearerAccessToken;
 import com.nimbusds.oauth2.sdk.token.RefreshToken;
 import com.nimbusds.openid.connect.sdk.AuthenticationErrorResponse;
 import com.nimbusds.openid.connect.sdk.AuthenticationRequest;
@@ -43,6 +46,12 @@ import com.nimbusds.openid.connect.sdk.AuthenticationSuccessResponse;
 import com.nimbusds.openid.connect.sdk.Nonce;
 import com.nimbusds.openid.connect.sdk.OIDCTokenResponse;
 import com.nimbusds.openid.connect.sdk.OIDCTokenResponseParser;
+import com.nimbusds.openid.connect.sdk.UserInfoRequest;
+import com.nimbusds.openid.connect.sdk.UserInfoResponse;
+import com.nimbusds.openid.connect.sdk.claims.UserInfo;
+
+import net.minidev.json.JSONObject;
+
 
 
 @RestController
@@ -53,6 +62,9 @@ public class MVCController {
 	String callback = "http://mucs.oidcclient.com:8003/callback";
 	String tokenEndpoint = "https://cas.example.org:8443/cas/oidc/token";
 	String authorizationEndpoint = "https://cas.example.org:8443/cas/oidc/authorize";
+	String userInfoEndpoint = "https://cas.example.org:8443/cas/oidc/profile";
+	AccessToken accessToken = null;
+	BearerAccessToken bearerAccessToken = null;
 	
 	/*@GetMapping("/CASlogin")
 	public ModelAndView redirectWithUsingRedirectPrefix(ModelMap model) {
@@ -72,10 +84,10 @@ public class MVCController {
 		return new ModelAndView("index");
 	}
 	
-	@GetMapping("/login")
+	@GetMapping("/login/code")
 	public void login(HttpServletRequest request, HttpServletResponse response) {
 		// The client identifier provisioned by the server
-		ClientID clientID = new ClientID(OIDCClientID);
+		ClientID clientID = new ClientID(this.OIDCClientID);
 
 		// Generate random state string for pairing the response to the request
 		State state = new State();
@@ -126,7 +138,7 @@ public class MVCController {
 		
 	}
 	
-	@GetMapping("/callback")
+	@GetMapping("/callback/code")
 	public ModelAndView callback(@RequestParam(value = "code", required = false) String code,
 			@RequestParam(value = "state", required = false) String state,
             HttpServletRequest request, HttpServletResponse response) {
@@ -183,11 +195,12 @@ public class MVCController {
 			OIDCTokenResponse successResponse = (OIDCTokenResponse)tokenResponse.toSuccessResponse();
 			// Get the ID and access token, the server may also return a refresh token
 			JWT idToken = successResponse.getOIDCTokens().getIDToken();
-			AccessToken accessToken = successResponse.getOIDCTokens().getAccessToken();
+			this.accessToken = successResponse.getOIDCTokens().getAccessToken();
+			this.bearerAccessToken = successResponse.getOIDCTokens().getBearerAccessToken();
 			RefreshToken refreshToken = successResponse.getOIDCTokens().getRefreshToken();
 			
 			System.out.println("idToken: "+ idToken);
-			System.out.println("accessToken: "+ accessToken);
+			System.out.println("accessToken: "+ this.accessToken);
 			System.out.println("refreshToken: "+ refreshToken);
 		}
 		return new ModelAndView("callback");
@@ -195,7 +208,50 @@ public class MVCController {
 	
 	@GetMapping("/info")
 	public String getUserInfo(Model model) {
-		//model.addAttribute("name", name);
+		// Make the request
+		HTTPResponse httpResponse = null;
+		UserInfoResponse userInfoResponse = null;
+
+		try {
+			httpResponse = new UserInfoRequest(new URI(this.userInfoEndpoint), this.bearerAccessToken)
+			    .toHTTPRequest()
+			    .send();
+
+			userInfoResponse = UserInfoResponse.parse(httpResponse);
+				
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (URISyntaxException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (ParseException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} 
+
+		// Parse the response
+		if (! userInfoResponse.indicatesSuccess()) {
+		    // The request failed, e.g. due to invalid or expired token
+		    System.out.println(userInfoResponse.toErrorResponse().getErrorObject().getCode());
+		    System.out.println(userInfoResponse.toErrorResponse().getErrorObject().getDescription());
+		    System.out.println("Error obteniendo la info");
+		}
+
+		// Extract the claims
+		UserInfo userInfo = userInfoResponse.toSuccessResponse().getUserInfo();
+		System.out.println("Subject: " + userInfo.getSubject());
+		System.out.println("client_id: " + userInfo.getClaim("client_id"));
+		System.out.println("service: " + userInfo.getClaim("service"));
+		
+		JSONObject attributes = (JSONObject) userInfo.getClaim("attributes");
+		System.out.println("Email: " + attributes.get("email"));
+		System.out.println("Email verified: " + attributes.get("email_verified"));
+		System.out.println("Given name: " + attributes.get("given_name"));
+		System.out.println("Family name: " + attributes.get("family_name"));
+		System.out.println("Name: " + attributes.get("name"));
+		System.out.println("Picture: " + attributes.get("picture"));
+		
 		return "greeting";
 	} 
 	
