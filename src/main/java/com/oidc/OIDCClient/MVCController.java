@@ -70,8 +70,8 @@ public class MVCController {
 	
 	String clientID = "OIDCClient"; 
 	String secret = "secret";
-	String codeCallback = "http://mucs.oidcclient.com:8003/callback/code";
-	String pkceCallback = "http://mucs.oidcclient.com:8003/callback/pkce";
+	String codeCallback = "https://mucs.oidcclient.com:8003/callback/code";
+	String pkceCallback = "https://mucs.oidcclient.com:8003/callback/pkce";
 	String OIDCTokenEndpoint = "https://cas.example.org:8443/cas/oidc/token";
 	String OAUTHTokenEndpoint = "https://cas.example.org:8443/cas/oauth2.0/token";
 	String OIDCAuthorizationEndpoint = "https://cas.example.org:8443/cas/oidc/authorize";
