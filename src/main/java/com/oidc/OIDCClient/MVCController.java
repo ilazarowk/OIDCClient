@@ -6,6 +6,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.Collections;
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
 
@@ -13,26 +14,40 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
 
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.ui.ModelMap;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.ModelAndView;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.nimbusds.jose.JOSEException;
+import com.nimbusds.jose.JWSAlgorithm;
+import com.nimbusds.jose.JWSHeader;
+import com.nimbusds.jose.crypto.RSASSASigner;
+import com.nimbusds.jose.jwk.JWKSet;
+import com.nimbusds.jose.proc.BadJOSEException;
 import com.nimbusds.jwt.JWT;
+import com.nimbusds.jwt.JWTParser;
+import com.nimbusds.jwt.SignedJWT;
 import com.nimbusds.oauth2.sdk.AuthorizationCode;
 import com.nimbusds.oauth2.sdk.AuthorizationCodeGrant;
 import com.nimbusds.oauth2.sdk.AuthorizationGrant;
 import com.nimbusds.oauth2.sdk.AuthorizationRequest;
 import com.nimbusds.oauth2.sdk.ParseException;
+import com.nimbusds.oauth2.sdk.ResponseMode;
 import com.nimbusds.oauth2.sdk.ResponseType;
 import com.nimbusds.oauth2.sdk.Scope;
 import com.nimbusds.oauth2.sdk.TokenErrorResponse;
+import com.nimbusds.oauth2.sdk.TokenIntrospectionRequest;
 import com.nimbusds.oauth2.sdk.TokenRequest;
 import com.nimbusds.oauth2.sdk.TokenResponse;
 import com.nimbusds.oauth2.sdk.auth.ClientAuthentication;
@@ -41,6 +56,7 @@ import com.nimbusds.oauth2.sdk.auth.Secret;
 import com.nimbusds.oauth2.sdk.http.HTTPRequest;
 import com.nimbusds.oauth2.sdk.http.HTTPResponse;
 import com.nimbusds.oauth2.sdk.id.ClientID;
+import com.nimbusds.oauth2.sdk.id.Issuer;
 import com.nimbusds.oauth2.sdk.id.State;
 import com.nimbusds.oauth2.sdk.pkce.CodeChallenge;
 import com.nimbusds.oauth2.sdk.pkce.CodeChallengeMethod;
@@ -60,6 +76,7 @@ import com.nimbusds.openid.connect.sdk.OIDCTokenResponseParser;
 import com.nimbusds.openid.connect.sdk.UserInfoRequest;
 import com.nimbusds.openid.connect.sdk.UserInfoResponse;
 import com.nimbusds.openid.connect.sdk.claims.UserInfo;
+import com.nimbusds.openid.connect.sdk.validators.IDTokenValidator;
 
 import net.minidev.json.JSONObject;
 
@@ -69,25 +86,23 @@ import net.minidev.json.JSONObject;
 public class MVCController {
 	
 	String clientID = "OIDCClient"; 
-	String secret = "secret";
+	String clientSecret = "secret";
 	String codeCallback = "https://mucs.oidcclient.com:8003/callback/code";
 	String pkceCallback = "https://mucs.oidcclient.com:8003/callback/pkce";
+	String jarmCallback = "https://mucs.oidcclient.com:8003/callback/jarm";
 	String OIDCTokenEndpoint = "https://cas.example.org:8443/cas/oidc/token";
-	String OAUTHTokenEndpoint = "https://cas.example.org:8443/cas/oauth2.0/token";
 	String OIDCAuthorizationEndpoint = "https://cas.example.org:8443/cas/oidc/authorize";
-	String OAUTHAuthorizationEndpoint = "https://cas.example.org:8443/cas/oauth2.0/authorize";
 	String userInfoEndpoint = "https://cas.example.org:8443/cas/oidc/profile";
+	String introspectionEndpoint = "https://cas.example.org:8443/cas/oidc/introspect";
+	
 	AccessToken accessToken = null;
 	BearerAccessToken bearerAccessToken = null;
 	RefreshToken refreshToken = null;
+	JWT idToken = null;
 	String codeChallenge = null;
 	CodeVerifier codeVerifier = null;
+	Nonce nonce = null;
 	
-	/*@GetMapping("/CASlogin")
-	public ModelAndView redirectWithUsingRedirectPrefix(ModelMap model) {
-        model.addAttribute("service", "http://localhost:8000");
-        return new ModelAndView("redirect:/https://cas.example.org/cas/login", model);
-    }*/
 	
 	
 	@GetMapping("/greeting")
@@ -96,8 +111,19 @@ public class MVCController {
 		return "greeting";
 	} 
 	
+	private String appMode;
+
+    @Autowired
+    public MVCController(Environment environment){
+        appMode = environment.getProperty("app-mode");
+    }
+	
 	@GetMapping("/")
 	public ModelAndView inicio(Model model) {
+		
+		model.addAttribute("datetime", new Date());
+        model.addAttribute("username", "asdfgggg");
+        model.addAttribute("mode", appMode);
 		return new ModelAndView("index");
 	}
 	
@@ -109,7 +135,7 @@ public class MVCController {
 		//State state = new State();
 
 		// Generate nonce
-		//Nonce nonce = new Nonce();
+		this.nonce = new Nonce();
 
 		// Compose the request (in code flow)
 		AuthenticationRequest req;
@@ -121,7 +147,7 @@ public class MVCController {
 			    new ClientID(this.clientID), // The client identifier provisioned by the server
 			    new URI(this.codeCallback),
 			    new State(), // Generate random state string for pairing the response to the request
-			    new Nonce()); // Generate nonce
+			    this.nonce); // Generate nonce
 			
 			String URIRedireccion = req.toHTTPRequest().getURL() + "?" + req.toHTTPRequest().getQuery();
 			response.sendRedirect(URIRedireccion);
@@ -214,12 +240,10 @@ public class MVCController {
 		
 	}
 	
-	
-	
 	@GetMapping("/callback/code")
 	public ModelAndView callbackCode(@RequestParam(value = "code", required = false) String code,
 			@RequestParam(value = "state", required = false) String state,
-            HttpServletRequest request, HttpServletResponse response) {
+            HttpServletRequest request, HttpServletResponse response, Model model) {
 		
 		// Construct the code grant from the code obtained from the authz endpoint
 		// and the original callback URI used at the authz endpoint
@@ -235,7 +259,7 @@ public class MVCController {
 
 		// The credentials to authenticate the client at the token endpoint
 		ClientID clientID = new ClientID(this.clientID);
-		Secret clientSecret = new Secret(this.secret);
+		Secret clientSecret = new Secret(this.clientSecret);
 		ClientAuthentication clientAuth = new ClientSecretBasic(clientID, clientSecret);
 
 		// The token endpoint
@@ -262,18 +286,22 @@ public class MVCController {
 		    // We got an error response...
 		    TokenErrorResponse errorResponse = tokenResponse.toErrorResponse();
 		    System.out.println("error response");
-		    System.out.println(errorResponse);
 		}else {
 			OIDCTokenResponse successResponse = (OIDCTokenResponse)tokenResponse.toSuccessResponse();
 			// Get the ID and access token, the server may also return a refresh token
-			JWT idToken = successResponse.getOIDCTokens().getIDToken();
+			this.idToken = successResponse.getOIDCTokens().getIDToken();
 			this.accessToken = successResponse.getOIDCTokens().getAccessToken();
 			this.bearerAccessToken = successResponse.getOIDCTokens().getBearerAccessToken();
 			this.refreshToken = successResponse.getOIDCTokens().getRefreshToken();
 			
-			System.out.println("idToken: "+ idToken);
+			System.out.println("idToken: "+ idToken.getParsedString());
 			System.out.println("accessToken: "+ this.accessToken);
 			System.out.println("refreshToken: "+ refreshToken);
+			
+			//model.addAttribute("IDToken", this.idToken.getParsedString());
+			JSONObject at = this.accessToken.toJSONObject();
+			model.addAttribute("accessToken", at.get("access_token"));
+			
 		}
 		return new ModelAndView("callback");
 	}
@@ -314,7 +342,7 @@ public class MVCController {
 			//////////////MANU//////////////
 			HTTPRequest requesttemp = tokenRequest.toHTTPRequest();
 			Map<String, List<String>> params = requesttemp.getQueryParameters();
-			params.put("client_secret", Collections.singletonList(this.secret));
+			params.put("client_secret", Collections.singletonList(this.clientSecret));
 			//params.put("code_verifier", Collections.singletonList(this.codeVerifier.getValue()));
 			requesttemp.setQuery(URLUtils.serializeParameters(params));
 			System.out.println("REQUEST TEMP: "+ requesttemp.getURL() + "?"+ requesttemp.getQuery());
@@ -343,7 +371,7 @@ public class MVCController {
 		}else {
 			OIDCTokenResponse successResponse = (OIDCTokenResponse)tokenResponse.toSuccessResponse();
 			// Get the ID and access token, the server may also return a refresh token
-			JWT idToken = successResponse.getOIDCTokens().getIDToken();
+			this.idToken = successResponse.getOIDCTokens().getIDToken();
 			this.accessToken = successResponse.getOIDCTokens().getAccessToken();
 			this.bearerAccessToken = successResponse.getOIDCTokens().getBearerAccessToken();
 			this.refreshToken = successResponse.getOIDCTokens().getRefreshToken();
@@ -414,7 +442,7 @@ public class MVCController {
 					new URL(this.OIDCTokenEndpoint+"?"+
 							"grant_type=refresh_token"+
 							"&client_id="+this.clientID+
-							"&client_secret="+this.secret+
+							"&client_secret="+this.clientSecret+
 							"&refresh_token="+this.refreshToken));
 			System.out.println(req.getURL());
 			System.out.println(req.getQuery());
@@ -453,5 +481,71 @@ public class MVCController {
 			 
 		}
 		return "refresh";
+	}
+	
+	@GetMapping("/verificarToken")
+	@ResponseBody
+	public boolean verificarToken(@RequestParam(value = "idtoken", required = false) String accessToken) {
+		
+		try {
+			TokenIntrospectionRequest req = new TokenIntrospectionRequest(
+					new URI(this.introspectionEndpoint),
+					new ClientSecretBasic(new ClientID(this.clientID), new Secret(this.clientSecret)),
+					new BearerAccessToken(accessToken));
+			
+			HTTPResponse resp = req.toHTTPRequest().send();
+            JSONObject jsResp= resp.getContentAsJSONObject();
+
+            return (boolean) jsResp.get("active");
+			
+		} catch (URISyntaxException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (ParseException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		return false;
+		/*
+		IDTokenValidator tokenValidator= null;
+		try {
+			tokenValidator = new IDTokenValidator(
+					new Issuer("http://cas.example.org/cas/oidc"),
+					new ClientID(this.clientID),
+					JWSAlgorithm.RS256,
+					JWKSet.load(new URL("https://cas.example.org:8443/cas/oidc/jwks")));
+		} catch (java.text.ParseException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+		} catch (MalformedURLException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+		JWT IDTokenModified = null;
+		try {
+			IDTokenModified = JWTParser.parse(idtoken);
+		} catch (java.text.ParseException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+		}
+		
+		try {
+			tokenValidator.validate(this.idToken,this.nonce);
+			return IDTokenModified.getParsedString();
+			
+		} catch (BadJOSEException | JOSEException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+			return "false";
+		}*/
+		
+		
 	}
 }

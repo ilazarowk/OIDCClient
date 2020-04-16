@@ -1,12 +1,33 @@
 <!DOCTYPE HTML>
-<html xmlns:th="http://www.thymeleaf.org">
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml" xmlns:th="http://www.thymeleaf.org">
 <head>
     <title>Getting Started: Serving Web Content</title>
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <link href="webjars/bootstrap/4.4.1/css/bootstrap.min.css"
+        rel="stylesheet">
 </head>
 <body>
+<div class="contaoiner">
+	<div class="navbar">
+	  <div class="navbar-inner">
+	    <a class="brand" href="#">Pagina de inicio cliente OIDC</a>
+	    <ul class="nav">
+	      <li class="active"><a href="#">Home</a></li>
+	      <li><a href="#">Link</a></li>
+	      <li><a href="#">Link</a></li>
+	    </ul>
+	  </div>
+	</div>
+</div>
     <p>Pagina de inicio cliente OIDC</p><br>
     <a href="https://mucs.oidcclient.com:8003/login/code">Login code</a><br>
     <a href="https://mucs.oidcclient.com:8003/login/pkce">Login PKCE</a><br>
+    
+    <div class="progress progress-striped active">
+  <div class="bar" style="width: 40%;"></div>
+</div>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>
+<script src="webjars/jquery/3.4.1/jquery.min.js"></script>
+<script src="webjars/bootstrap/4.4.1/js/bootstrap.min.js"></script>
 </body>
 </html>

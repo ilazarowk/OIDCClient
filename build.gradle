@@ -28,6 +28,13 @@ dependencies {
 	implementation 'com.nimbusds:oauth2-oidc-sdk:7.3'
 	//JSON
 	compile ('com.fasterxml.jackson.core:jackson-databind:2.9.8')
+	// https://mvnrepository.com/artifact/org.webjars/bootstrap
+	//compile group: 'org.webjars', name: 'bootstrap', version: '4.4.1'
+	// https://mvnrepository.com/artifact/org.webjars/jquery
+	//compile group: 'org.webjars', name: 'jquery', version: '3.4.1'
+	// https://mvnrepository.com/artifact/org.webjars/bootstrap-datepicker
+	//compile group: 'org.webjars', name: 'bootstrap-datepicker', version: '1.9.0'
+	
 	
 	developmentOnly 'org.springframework.boot:spring-boot-devtools'
 	providedRuntime 'org.springframework.boot:spring-boot-starter-tomcat'
