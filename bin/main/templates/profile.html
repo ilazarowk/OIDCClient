@@ -1,0 +1,192 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Getting Started: Serving Web Content</title>
+    <!-- Required meta tags -->
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no"/>
+
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css" integrity="sha384-Vkoo8x4CGsO3+Hhxv8T/Q5PaXtkKtu6ug5TOeNV6gBiFeWPGFN9MuhOf23Q9Ifjh" crossorigin="anonymous"/>
+
+</head>
+<body>
+    
+<div class="container">
+        <div class="row">
+            <div class="col-12">
+                <div class="card">
+
+                    <div class="card-body">
+                        <div class="card-title mb-4">
+                            <div class="d-flex justify-content-start">
+                                <div class="image-container">
+                                    <img th:src="${picture}" id="imgProfile" style="width: 150px; height: 150px" class="img-thumbnail" />
+                                    <div class="middle">
+                                        <input type="file" style="display: none;" id="profilePicture" name="file" />
+                                    </div>
+                                </div>
+                                <div class="userData ml-3">
+                                    <h2 class="d-block" style="font-size: 1.5rem; font-weight: bold"><span th:text="${name}"></span></h2>
+                                    <h6 class="d-block"><a href="javascript:void(0)">1,500</a> Video Uploads</h6>
+                                    <h6 class="d-block"><a href="javascript:void(0)">300</a> Blog Posts</h6>
+                                </div>
+                                <div class="ml-auto">
+                                    <input type="button" class="btn btn-primary d-none" id="btnDiscard" value="Discard Changes" />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-12">
+                                <ul class="nav nav-tabs mb-4" id="myTab" role="tablist">
+                                    <li class="nav-item">
+                                        <a class="nav-link active" id="basicInfo-tab" data-toggle="tab" href="#basicInfo" role="tab" aria-controls="basicInfo" aria-selected="true">Información básica</a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a class="nav-link" id="connectedServices-tab" data-toggle="tab" href="#connectedServices" role="tab" aria-controls="connectedServices" aria-selected="false">Otra info</a>
+                                    </li>
+                                </ul>
+                                <div class="tab-content ml-1" id="myTabContent">
+                                    <div class="tab-pane fade show active" id="basicInfo" role="tabpanel" aria-labelledby="basicInfo-tab">
+                                        
+
+                                        <div class="row">
+                                            <div class="col-sm-3 col-md-2 col-5">
+                                                <label style="font-weight:bold;">Nombre</label>
+                                            </div>
+                                            <div class="col-md-8 col-6">
+                                                <span th:text="${given_name}"></span>
+                                            </div>
+                                        </div>
+                                        <hr />
+
+                                        <div class="row">
+                                            <div class="col-sm-3 col-md-2 col-5">
+                                                <label style="font-weight:bold;">Apellidos</label>
+                                            </div>
+                                            <div class="col-md-8 col-6">
+                                               <span th:text="${family_name}"></span>
+                                            </div>
+                                        </div>
+                                        <hr />
+                                        
+                                        
+                                        <div class="row">
+                                            <div class="col-sm-3 col-md-2 col-5">
+                                                <label style="font-weight:bold;">Correo electrónico</label>
+                                            </div>
+                                            <div class="col-md-8 col-6">
+                                                 <span th:text="${email}"></span>
+                                            </div>
+                                        </div>
+                                        <hr />
+
+                                    </div>
+                                    <div class="tab-pane fade" id="connectedServices" role="tabpanel" aria-labelledby="ConnectedServices-tab">
+                                        <div class="row">
+                                            <div class="col-sm-3 col-md-2 col-5">
+                                                <label style="font-weight:bold;">Access Token</label>
+                                            </div>
+                                            <div class="col-5">
+                                             	<input type="text" class="form-control" id="accessTokenInput" th:value="${accessToken}">
+                                            </div>
+                                            <div class="col-md-auto">
+                                            	<button id="validar" type="button" class="btn btn-primary">Validar Token</button>
+                                            </div>
+                                            <div id="alerta" class="col-md-auto"></div>
+                                        </div>
+                                        <hr />
+                                        <div class="row">
+                                            <div class="col-sm-3 col-md-2 col-5">
+                                                <label style="font-weight:bold;">Refresh Token</label>
+                                            </div>
+                                            <div class="col-5">
+                                                <span id="refreshTokenSpan" th:text="${refreshToken}"></span>
+                                            </div>
+                                            <div class="col-md-auto">
+                                            	<button id="refrescar" type="button" class="btn btn-primary">Refrescar Tokens</button>
+                                            </div>
+                                        </div>
+                                        <hr />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- jQuery first, then Popper.js, then Bootstrap JS 
+    <script src="https://code.jquery.com/jquery-3.4.1.slim.min.js" integrity="sha384-J6qa4849blE2+poT4WnyKhv5vZF5SrPo0iEjwBvKU7imGFAV0wwj1yYfoRSJoZ+n" crossorigin="anonymous"></script>-->
+    
+	<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>    
+    <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.0/dist/umd/popper.min.js" integrity="sha384-Q6E9RHvbIyZFJoft+2mJbHaEWldlvI9IOYy5n3zV9zzTtmI3UksdQRVvoxMfooAo" crossorigin="anonymous"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/js/bootstrap.min.js" integrity="sha384-wfSDF2E50Y2D1uUdj0O3uMBJnjuUD4Ih7YwaYd1iqfktj0Uod8GCExl3Og8ifwB6" crossorigin="anonymous"></script>
+	<script>
+	$("#validar").click(function () {
+		$.ajax({
+			  url: "/verificarToken",
+			  type: "get", //send it through get method
+			  data: { 
+			    accesstoken: $("#accessTokenInput").val()
+			  },
+			  success: function(response) {
+			    if(response){
+			    	var alerta = "<div class=\"col-md-auto alert alert-success alert-dismissible fade show\" role=\"alert\">"+
+					  "Token válido"+
+					  "<button type=\"button\" class=\"close\" data-dismiss=\"alert\" aria-label=\"Close\">"+
+					  "  <span aria-hidden=\"true\">&times;</span>"+
+					  "</button>"+
+					  "</div>";
+			    	$('#alerta').html(alerta);
+			    }else{
+			    	var alerta = "<div class=\"col-md-auto alert alert-danger alert-dismissible fade show\" role=\"alert\">"+
+					  "Token no válido"+
+					  "<button type=\"button\" class=\"close\" data-dismiss=\"alert\" aria-label=\"Close\">"+
+					  "  <span aria-hidden=\"true\">&times;</span>"+
+					  "</button>"+
+					  "</div>";
+			    	$('#alerta').html(alerta);
+			    }
+			  },
+			  error: function(xhr) {
+				  var alerta = "<div class=\"col-md-auto alert alert-danger alert-dismissible fade show\" role=\"alert\">"+
+				  "Error en la petición"+
+				  "<button type=\"button\" class=\"close\" data-dismiss=\"alert\" aria-label=\"Close\">"+
+				  "  <span aria-hidden=\"true\">&times;</span>"+
+				  "</button>"+
+				  "</div>";
+		    	$('#alerta').html(alerta);
+			  }
+			});
+		
+	});
+	
+	$("#refrescar").click(function () {
+		$.ajax({
+			  url: "/refreshTokens",
+			  type: "get", //send it through get method
+			  data: { 
+			    accesstoken: $("#accessTokenInput").val()
+			  },
+			  success: function(response) {
+			    var obj = JSON.parse(response);
+			    $('#accessTokenInput').val(obj.accessToken);
+			    $('#refreshTokenSpan').text(obj.refreshToken)
+			  },
+			  error: function(xhr) {
+
+			  }
+			});
+		
+	});
+	</script>
+
+</body>
+</html>

@@ -1,0 +1,52 @@
+<div th:fragment="header">
+<nav class="navbar fixed-top navbar-expand-lg navbar-dark bg-dark">
+  <a class="navbar-brand" href="#">
+	 <img src="img/hotel3.svg" width="30" height="30" class="d-inline-block align-top" alt="">
+	 Hotel
+  </a>
+  <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+    <span class="navbar-toggler-icon"></span>
+  </button>
+
+  <div class="collapse navbar-collapse" id="navbarSupportedContent">
+    <ul class="navbar-nav mr-auto">
+      <li id="perfil" class="nav-item active" style="display: none;">
+        <a class="nav-link" href="https://mucs.oidcclient.com:8003/userInfo">Perfil</a>
+      </li>
+    </ul>
+    
+      <button id="login" class="btn btn-outline-success my-2 my-sm-0" type="button"
+      style="display: none;"
+      onclick="location.href='https://mucs.oidcclient.com:8003/login'">Login</button>
+      
+      <button id="logout" class="btn btn-outline-success my-2 my-sm-0" type="button"
+      style="display: none;"
+      onclick="location.href='https://mucs.oidcclient.com:8003/logout'">Logout</button>
+
+  </div>
+</nav>
+
+<script>
+  	$( document ).ready(function() {
+    	$.ajax({
+			  url: "/isSignedOn",
+			  type: "get", //send it through get method
+			  success: function(response) {
+				  if(response){
+				  	$('#login').hide();
+				  	$('#logout').show();
+				  	$('#perfil').show();
+				  }else{
+				    $('#login').show();
+				  	$('#logout').hide();
+				  	$('#perfil').hide();
+				  }
+			  },
+			  error: function(xhr) {
+
+			  }
+			});
+	});
+  	</script>
+
+</div>

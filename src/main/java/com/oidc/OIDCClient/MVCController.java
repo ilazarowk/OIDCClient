@@ -19,9 +19,12 @@ import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.ui.ModelMap;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
@@ -50,6 +53,7 @@ import com.nimbusds.oauth2.sdk.TokenErrorResponse;
 import com.nimbusds.oauth2.sdk.TokenIntrospectionRequest;
 import com.nimbusds.oauth2.sdk.TokenRequest;
 import com.nimbusds.oauth2.sdk.TokenResponse;
+import com.nimbusds.oauth2.sdk.TokenRevocationRequest;
 import com.nimbusds.oauth2.sdk.auth.ClientAuthentication;
 import com.nimbusds.oauth2.sdk.auth.ClientSecretBasic;
 import com.nimbusds.oauth2.sdk.auth.Secret;
@@ -94,6 +98,7 @@ public class MVCController {
 	String OIDCAuthorizationEndpoint = "https://cas.example.org:8443/cas/oidc/authorize";
 	String userInfoEndpoint = "https://cas.example.org:8443/cas/oidc/profile";
 	String introspectionEndpoint = "https://cas.example.org:8443/cas/oidc/introspect";
+	String revocationEndpoint = "https://cas.example.org:8443/cas/oidc/revoke";
 	
 	AccessToken accessToken = null;
 	BearerAccessToken bearerAccessToken = null;
@@ -103,29 +108,15 @@ public class MVCController {
 	CodeVerifier codeVerifier = null;
 	Nonce nonce = null;
 	
-	
-	
-	@GetMapping("/greeting")
-	public String greeting(@RequestParam(name="name", required=false, defaultValue="World") String name, Model model) {
-		model.addAttribute("name", name);
-		return "greeting";
-	} 
-	
-	private String appMode;
-
-    @Autowired
-    public MVCController(Environment environment){
-        appMode = environment.getProperty("app-mode");
-    }
-	
 	@GetMapping("/")
 	public ModelAndView inicio(Model model) {
-		
-		model.addAttribute("datetime", new Date());
-        model.addAttribute("username", "asdfgggg");
-        model.addAttribute("mode", appMode);
 		return new ModelAndView("index");
 	}
+	
+	@GetMapping("/login")
+	public ModelAndView login() {
+		return new ModelAndView("login");
+	} 
 	
 	@GetMapping("/login/code")
 	public void loginCode(HttpServletRequest request, HttpServletResponse response) {
@@ -133,7 +124,7 @@ public class MVCController {
 
 		// Generate random state string for pairing the response to the request
 		//State state = new State();
-
+		
 		// Generate nonce
 		this.nonce = new Nonce();
 
@@ -303,7 +294,7 @@ public class MVCController {
 			model.addAttribute("accessToken", at.get("access_token"));
 			
 		}
-		return new ModelAndView("callback");
+		return new ModelAndView("index");
 	}
 	
 	@GetMapping("/callback/pkce")
@@ -380,11 +371,11 @@ public class MVCController {
 			System.out.println("accessToken: "+ this.accessToken);
 			System.out.println("refreshToken: "+ this.refreshToken);
 		}
-		return new ModelAndView("callback");
+		return new ModelAndView("index");
 	}
 	
-	@GetMapping("/info")
-	public String getUserInfo(Model model) {
+	@GetMapping("/userInfo")
+	public ModelAndView getUserInfo(Model model) {
 		// Make the request
 		HTTPResponse httpResponse = null;
 		UserInfoResponse userInfoResponse = null;
@@ -429,11 +420,20 @@ public class MVCController {
 		System.out.println("Name: " + attributes.get("name"));
 		System.out.println("Picture: " + attributes.get("picture"));
 		
-		return "greeting";
+		model.addAttribute("name", attributes.get("name"));
+		model.addAttribute("email", attributes.get("email"));
+		model.addAttribute("email_verified", attributes.get("email_verified"));
+		model.addAttribute("given_name", attributes.get("given_name"));
+		model.addAttribute("family_name", attributes.get("family_name"));
+		model.addAttribute("picture", attributes.get("picture"));
+		model.addAttribute("accessToken", this.accessToken);
+		model.addAttribute("refreshToken", this.refreshToken);
+		
+		return new ModelAndView("profile");
 	} 
 	
 	@GetMapping("/refreshTokens")
-	public String refreshTokens(HttpServletRequest request, HttpServletResponse response) {
+	public String refreshTokens(Model model) {
 		
 		HTTPResponse respuesta = null;
 		TokenResponse tokenResponse = null;
@@ -444,8 +444,6 @@ public class MVCController {
 							"&client_id="+this.clientID+
 							"&client_secret="+this.clientSecret+
 							"&refresh_token="+this.refreshToken));
-			System.out.println(req.getURL());
-			System.out.println(req.getQuery());
 			
 			respuesta = req.send();
 			JSONObject jO = respuesta.getContentAsJSONObject();
@@ -465,8 +463,7 @@ public class MVCController {
 		if (! tokenResponse.indicatesSuccess()) {
 		    // We got an error response...
 		    TokenErrorResponse errorResponse = tokenResponse.toErrorResponse();
-		    System.out.println("error response");
-		    System.out.println(errorResponse.toErrorResponse());
+		    return "Error";
 		}else {
 			OIDCTokenResponse successResponse = (OIDCTokenResponse)tokenResponse.toSuccessResponse();
 			// Get the ID and access token, the server may also return a refresh token
@@ -475,17 +472,17 @@ public class MVCController {
 			this.bearerAccessToken = successResponse.getOIDCTokens().getBearerAccessToken();
 			this.refreshToken = successResponse.getOIDCTokens().getRefreshToken();
 			
-			System.out.println("idToken: "+ idToken);
-			System.out.println("accessToken: "+ this.accessToken);
-			System.out.println("refreshToken: "+ this.refreshToken);
+			JSONObject objectResponse = new JSONObject();
+			objectResponse.put("accessToken",this.accessToken.getValue());
+			objectResponse.put("refreshToken",this.refreshToken);
+			
+			return objectResponse.toJSONString();
 			 
 		}
-		return "refresh";
 	}
 	
 	@GetMapping("/verificarToken")
-	@ResponseBody
-	public boolean verificarToken(@RequestParam(value = "idtoken", required = false) String accessToken) {
+	public boolean verificarToken(@RequestParam(value = "accesstoken", required = false) String accessToken) {
 		
 		try {
 			TokenIntrospectionRequest req = new TokenIntrospectionRequest(
@@ -508,44 +505,94 @@ public class MVCController {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-		return false;
-		/*
-		IDTokenValidator tokenValidator= null;
+		return false;		
+		
+	}
+	
+	@GetMapping("/revocarTokens")
+	public void revocarToken() {
+		
 		try {
-			tokenValidator = new IDTokenValidator(
-					new Issuer("http://cas.example.org/cas/oidc"),
-					new ClientID(this.clientID),
-					JWSAlgorithm.RS256,
-					JWKSet.load(new URL("https://cas.example.org:8443/cas/oidc/jwks")));
-		} catch (java.text.ParseException e1) {
-			// TODO Auto-generated catch block
-			e1.printStackTrace();
-		} catch (MalformedURLException e) {
+			TokenRevocationRequest req = new TokenRevocationRequest(
+					new URI(this.revocationEndpoint),
+					new ClientSecretBasic(new ClientID(this.clientID), new Secret(this.clientSecret)),
+					this.bearerAccessToken);
+			
+			req.toHTTPRequest().send();
+			
+		} catch (URISyntaxException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
-		}
+		}		
 		
-		JWT IDTokenModified = null;
-		try {
-			IDTokenModified = JWTParser.parse(idtoken);
-		} catch (java.text.ParseException e1) {
-			// TODO Auto-generated catch block
-			e1.printStackTrace();
-		}
-		
-		try {
-			tokenValidator.validate(this.idToken,this.nonce);
-			return IDTokenModified.getParsedString();
+	}
+	
+	@GetMapping("/logout")
+	public ModelAndView logout(@RequestParam(value = "logout", required = false) String logout, HttpServletResponse response) {
+		if(logout==null) {
+			return new ModelAndView("logout");
+		}else{
 			
-		} catch (BadJOSEException | JOSEException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-			return "false";
-		}*/
+			System.out.println("logout="+logout);
+			HTTPRequest req;
+			try {
+				req = new HTTPRequest(HTTPRequest.Method.GET, 
+						new URL(this.revocationEndpoint));
+				req.send();
+				
+			} catch (MalformedURLException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+			
+			this.idToken=null;
+			this.accessToken=null;
+			this.bearerAccessToken=null;
+			this.refreshToken=null;
+			this.codeChallenge=null;
+			this.codeVerifier=null;
+			this.nonce=null;
+			
+			if(logout.equalsIgnoreCase("service")) {
+				return new ModelAndView("index");
+			}else {
+				String URIRedireccion = "https://cas.example.org:8443/cas/logout?service=https://mucs.oidcclient.com:8003";
+				try {
+					response.sendRedirect(URIRedireccion);
+				} catch (IOException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+				return null;
+			}	
+		}
 		
 		
+	}
+	
+	@GetMapping("/isSignedOn")
+	public boolean isSignedOn(HttpSession session) {
+		if(this.accessToken!=null)
+			return true;
+		else
+			return false;
+	}
+	
+	@RequestMapping(method = RequestMethod.POST
+	        , consumes = {"application/x-www-form-urlencoded"}
+	        ,value = "/sessionended"
+	)
+	public
+	@ResponseBody
+	String createXXXX(HttpSession session, @RequestBody MultiValueMap params) throws Exception {
+	    System.out.println("params are " + params);
+	    //session.invalidate();
+	    return "hello";
 	}
 }
